@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>サクッとコピペ</title>
+
+<style>
+:root {
+    --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    --accent-color: #667eea;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--primary-gradient);
+    display: flex;
+    justify-content: center;
+    padding: 15px;
+    margin: 0;
+}
+
+.container {
+    background: white;
+    width: 100%;
+    max-width: 600px;
+    padding: 20px;
+    border-radius: 18px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+}
+
+h2 {
+    text-align: center;
+    margin-bottom: 15px;
+}
+
+input {
+    width: 100%;
+    padding: 14px;
+    margin-bottom: 10px;
+    border-radius: 10px;
+    border: 1px solid #ddd;
+    font-size: 16px; /* iPhoneズーム防止 */
+    box-sizing: border-box;
+}
+
+button {
+    padding: 10px 14px;
+    border-radius: 10px;
+    border: none;
+    cursor: pointer;
+    margin-left: 5px;
+    font-size: 15px;
+}
+
+.add-btn {
+    width: 100%;
+    background: var(--accent-color);
+    color: white;
+    margin-bottom: 15px;
+    padding: 14px;
+    font-size: 16px;
+}
+
+.list-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px;
+    margin-bottom: 8px;
+    border: 1px solid #eee;
+    border-radius: 10px;
+    font-size: 15px;
+}
+
+.star-btn { background: none; font-size: 20px; }
+.copy-btn { background: #f0f0f0; }
+.delete-btn { background: none; color: red; font-size: 18px; }
+
+/* トースト */
+#toast {
+    visibility: hidden;
+    background: rgba(0,0,0,0.85);
+    color: white;
+    padding: 14px 22px;
+    border-radius: 30px;
+    position: fixed;
+    bottom: 40px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 14px;
+}
+
+#toast.show {
+    visibility: visible;
+    animation: fadein 0.3s, fadeout 0.3s 1.7s;
+}
+
+@keyframes fadein {
+    from { opacity: 0; bottom: 20px; }
+    to { opacity: 1; bottom: 40px; }
+}
+@keyframes fadeout {
+    from { opacity: 1; bottom: 40px; }
+    to { opacity: 0; bottom: 20px; }
+}
+
+/* ？ボタン */
+#helpBtn {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: var(--accent-color);
+    color: white;
+    font-size: 28px;
+    border: none;
+}
+
+/* 背景暗くする */
+#overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.5);
+}
+
+/* 説明ポップアップ */
+#helpBox {
+    display: none;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 85%;
+    max-width: 350px;
+    background: white;
+    padding: 20px;
+    border-radius: 15px;
+    text-align: center;
+    font-size: 14px;
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+    <h2>📋 サクッとコピペ</h2>
+
+    <input type="text" id="searchInput" placeholder="🔎 検索..." oninput="displayWords()">
+    <input type="text" id="wordInput" placeholder="新しい言葉を登録...">
+    <button class="add-btn" onclick="addWord()">追加する</button>
+
+    <div id="wordList"></div>
+</div>
+
+<div id="toast">コピーしました</div>
+
+<button id="helpBtn" onclick="toggleHelp()">？</button>
+
+<div id="overlay" onclick="toggleHelp()"></div>
+
+<div id="helpBox">
+新しい言葉を登録すると即座にコピーをすることができるようになります。<br><br>
+星マークを付けてお気に入りにすると常に上の方に表示されるようになります。<br><br>
+検索をすることで今まで登録した言葉をすぐに見つけることができます。<br><br>
+ぜひ使ってね！ (*'ω'*)SOU
+</div>
+
+<script>
+
+window.onload = function() {
+    displayWords();
+    document.getElementById("wordInput").addEventListener("keydown", function(e) {
+        if (e.key === "Enter") addWord();
+    });
+};
+
+function addWord() {
+    const input = document.getElementById("wordInput");
+    const value = input.value.trim();
+    if (!value) return;
+
+    const words = JSON.parse(localStorage.getItem("myWordsPro") || "[]");
+
+    if (words.some(w => w.text === value)) {
+        alert("すでに登録されています");
+        input.value = "";
+        return;
+    }
+
+    words.push({ text: value, favorite: false });
+    localStorage.setItem("myWordsPro", JSON.stringify(words));
+
+    input.value = "";
+    input.focus();
+    displayWords();
+}
+
+function displayWords() {
+    const wordList = document.getElementById("wordList");
+    const search = document.getElementById("searchInput").value.toLowerCase();
+    let words = JSON.parse(localStorage.getItem("myWordsPro") || "[]");
+
+    words.sort((a, b) => b.favorite - a.favorite);
+
+    wordList.innerHTML = "";
+
+    words.forEach(word => {
+        if (search && !word.text.toLowerCase().includes(search)) return;
+
+        const div = document.createElement("div");
+        div.className = "list-item";
+
+        const span = document.createElement("span");
+        span.textContent = word.text;
+
+        const btnArea = document.createElement("div");
+
+        const starBtn = document.createElement("button");
+        starBtn.className = "star-btn";
+        starBtn.textContent = word.favorite ? "⭐" : "☆";
+        starBtn.onclick = () => toggleFavorite(word.text);
+
+        const copyBtn = document.createElement("button");
+        copyBtn.className = "copy-btn";
+        copyBtn.textContent = "コピー";
+        copyBtn.onclick = () => copyText(word.text);
+
+        const deleteBtn = document.createElement("button");
+        deleteBtn.className = "delete-btn";
+        deleteBtn.textContent = "×";
+        deleteBtn.onclick = () => deleteWord(word.text);
+
+        btnArea.appendChild(starBtn);
+        btnArea.appendChild(copyBtn);
+        btnArea.appendChild(deleteBtn);
+
+        div.appendChild(span);
+        div.appendChild(btnArea);
+        wordList.appendChild(div);
+    });
+}
+
+function copyText(text) {
+    navigator.clipboard.writeText(text).then(() => {
+        const toast = document.getElementById("toast");
+        toast.className = "show";
+        setTimeout(() => toast.className = "", 2000);
+    });
+}
+
+function toggleFavorite(text) {
+    const words = JSON.parse(localStorage.getItem("myWordsPro") || "[]");
+    const target = words.find(w => w.text === text);
+    if (target) target.favorite = !target.favorite;
+    localStorage.setItem("myWordsPro", JSON.stringify(words));
+    displayWords();
+}
+
+function deleteWord(text) {
+    if (!confirm("削除しますか？")) return;
+    let words = JSON.parse(localStorage.getItem("myWordsPro") || "[]");
+    words = words.filter(w => w.text !== text);
+    localStorage.setItem("myWordsPro", JSON.stringify(words));
+    displayWords();
+}
+
+function toggleHelp() {
+    const box = document.getElementById("helpBox");
+    const overlay = document.getElementById("overlay");
+
+    const isVisible = box.style.display === "block";
+
+    box.style.display = isVisible ? "none" : "block";
+    overlay.style.display = isVisible ? "none" : "block";
+}
+
+</script>
+
+</body>
+</html>
